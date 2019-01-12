@@ -229,8 +229,11 @@ static uint32_t render_status_block(cairo_t *cairo,
 	uint32_t bg_color = block->urgent
 		? config->colors.urgent_workspace.background : block->background;
 	if (bg_color) {
-		render_sharp_rectangle(cairo, bg_color, x_pos, y_pos,
-				block_width, render_height);
+		cairo_set_source_u32(cairo, bg_color);
+		cairo_rectangle(cairo, pos - 0.5 * output->scale,
+				/* output->scale, width, height); */
+				0, width, height);
+		cairo_fill(cairo);
 	}
 
 	uint32_t border_color = block->urgent
@@ -262,9 +265,64 @@ static uint32_t render_status_block(cairo_t *cairo,
 	uint32_t color = block->color ?  *block->color : config->colors.statusline;
 	color = block->urgent ? config->colors.urgent_workspace.text : color;
 	cairo_set_source_u32(cairo, color);
-	pango_printf(cairo, config->font, output->scale,
-			block->markup, "%s", block->full_text);
-	x_pos += width;
+
+	static uint32_t _bg_color = 0;
+	uint32_t accent_offset = 0x44444400;
+
+	if (strncmp(block->full_text, "", 2)) {
+		pango_printf(cairo, config->font, output->scale,
+				block->markup, "%s", block->full_text);
+		uint32_t accent = bg_color + accent_offset;
+		cairo_set_source_u32(cairo, accent);
+		cairo_set_line_width(cairo, 1.0);
+
+		cairo_move_to(cairo, offset, 0.0);
+		cairo_line_to(cairo, offset + text_width + 20, 0.0);
+		cairo_stroke(cairo);
+
+		cairo_move_to(cairo, offset, height - 1.0);
+		cairo_line_to(cairo, offset + text_width + 20, height - 1.0);
+		cairo_stroke(cairo);
+
+	} else {
+		cairo_set_line_cap (cairo, CAIRO_LINE_CAP_BUTT);
+		cairo_set_line_width(cairo, 1.0);
+		cairo_move_to(cairo, offset + text_width, 0.0);
+		cairo_line_to(cairo, offset, height / 2.0);
+		cairo_line_to(cairo, offset + text_width, height);
+		cairo_close_path(cairo);
+		cairo_stroke_preserve(cairo);
+		cairo_fill(cairo);
+
+		uint32_t accent = _bg_color + accent_offset;
+		cairo_set_source_u32(cairo, accent);
+		cairo_set_line_width(cairo, 1.0);
+		cairo_move_to(cairo, offset + text_width, 0.0);
+		cairo_line_to(cairo, offset, height / 2.0);
+		cairo_line_to(cairo, offset + text_width, height);
+		/* cairo_close_path(cairo); */
+		cairo_stroke(cairo);
+
+		/* accent = _bg_color + accent_offset; */
+		/* cairo_set_source_u32(cairo, accent); */
+		/* /\* uint32_t white = 0xffffffff; *\/ */
+		/* cairo_set_line_width(cairo, 0.5); */
+		/* cairo_move_to(cairo, offset + text_width - 2, 2.0); */
+		/* cairo_line_to(cairo, offset - 2, height / 2.0); */
+		/* cairo_line_to(cairo, offset + text_width - 2, height); */
+		/* /\* cairo_close_path(cairo); *\/ */
+		/* cairo_stroke(cairo); */
+
+		/* cairo_move_to(cairo, offset, 2.0); */
+		/* cairo_line_to(cairo, offset + text_width, 2.0); */
+		/* cairo_stroke(cairo); */
+
+		/* cairo_move_to(cairo, offset, height - 1.0); */
+		/* cairo_line_to(cairo, offset + text_width, height - 1.0); */
+		/* cairo_stroke(cairo); */
+	}
+
+	pos += width;
 
 	if (block->border && block->border_right > 0) {
 		x_pos += margin;
@@ -291,6 +349,7 @@ static uint32_t render_status_block(cairo_t *cairo,
 			cairo_stroke(cairo);
 		}
 	}
+	_bg_color = bg_color;
 	return output->height;
 }
 
@@ -340,6 +399,7 @@ static uint32_t render_binding_mode_indicator(cairo_t *cairo,
 	int ws_horizontal_padding = WS_HORIZONTAL_PADDING * output->scale;
 	int border_width = BORDER_WIDTH * output->scale;
 
+	uint32_t overlap = 20;
 	uint32_t ideal_height = text_height + ws_vertical_padding * 2
 		+ border_width * 2;
 	uint32_t ideal_surface_height = ideal_height / output->scale;
@@ -347,26 +407,48 @@ static uint32_t render_binding_mode_indicator(cairo_t *cairo,
 			output->height < ideal_surface_height) {
 		return ideal_surface_height;
 	}
+	uint32_t _width = ws_horizontal_padding * 2 + text_width + border_width * 2;
 	uint32_t width = text_width + ws_horizontal_padding * 2 + border_width * 2;
 
 	uint32_t height = output->height * output->scale;
-	cairo_set_source_u32(cairo, config->colors.binding_mode.background);
-	cairo_rectangle(cairo, x, 0, width, height);
+	/* cairo_set_source_u32(cairo, config->colors.binding_mode.background); */
+	/* cairo_rectangle(cairo, x, 0, width, height); */
+	/* cairo_fill(cairo); */
+	/* cairo_set_source_u32(cairo, box_colors.border); */
+	cairo_set_source_u32(cairo, config->colors.binding_mode.border);
+	cairo_move_to(cairo, x, 0);
+	cairo_line_to(cairo, x + _width, 0);
+	cairo_line_to(cairo, x + _width + overlap, height / 2);
+	cairo_line_to(cairo, x + _width, height);
+	cairo_line_to(cairo, x, height);
+	cairo_line_to(cairo, x + overlap, height / 2);
+	cairo_close_path(cairo);
 	cairo_fill(cairo);
 
-	cairo_set_source_u32(cairo, config->colors.binding_mode.border);
-	cairo_rectangle(cairo, x, 0, width, border_width);
+	cairo_set_source_u32(cairo, config->colors.binding_mode.background);
+	/* cairo_set_source_u32(cairo, box_colors.background); */
+	cairo_move_to(cairo, x + 1, 1);
+	cairo_line_to(cairo, x + _width - 1, 1);
+	cairo_line_to(cairo, x + _width + overlap - 1, height / 2);
+	cairo_line_to(cairo, x + _width - 1, height - 1);
+	cairo_line_to(cairo, x + 1, height - 1);
+	cairo_line_to(cairo, x + overlap + 1, height / 2);
+	cairo_close_path(cairo);
 	cairo_fill(cairo);
-	cairo_rectangle(cairo, x, 0, border_width, height);
-	cairo_fill(cairo);
-	cairo_rectangle(cairo, x + width - border_width, 0, border_width, height);
-	cairo_fill(cairo);
-	cairo_rectangle(cairo, x, height - border_width, width, border_width);
-	cairo_fill(cairo);
+
+	/* cairo_set_source_u32(cairo, config->colors.binding_mode.border); */
+	/* cairo_rectangle(cairo, x, 0, width, border_width); */
+	/* cairo_fill(cairo); */
+	/* cairo_rectangle(cairo, x, 0, border_width, height); */
+	/* cairo_fill(cairo); */
+	/* cairo_rectangle(cairo, x + width - border_width, 0, border_width, height); */
+	/* cairo_fill(cairo); */
+	/* cairo_rectangle(cairo, x, height - border_width, width, border_width); */
+	/* cairo_fill(cairo); */
 
 	double text_y = height / 2.0 - text_height / 2.0;
 	cairo_set_source_u32(cairo, config->colors.binding_mode.text);
-	cairo_move_to(cairo, x + width / 2 - text_width / 2, (int)floor(text_y));
+	cairo_move_to(cairo, x + width / 2 - text_width / 2 + 10, (int)floor(text_y));
 	pango_printf(cairo, config->font, output->scale,
 			output->bar->mode_pango_markup, "%s", mode);
 	return output->height;
@@ -397,6 +479,7 @@ static uint32_t render_workspace_button(cairo_t *cairo,
 		box_colors = config->colors.inactive_workspace;
 	}
 
+	uint32_t overlap = 20;
 	uint32_t height = output->height * output->scale;
 
 	int text_width, text_height;
@@ -415,25 +498,49 @@ static uint32_t render_workspace_button(cairo_t *cairo,
 		return ideal_surface_height;
 	}
 
-	uint32_t width = ws_horizontal_padding * 2 + text_width + border_width * 2;
+	uint32_t _width = ws_horizontal_padding * 2 + text_width + border_width * 2;
+	uint32_t width = ws_horizontal_padding * 2 + text_width + border_width * 2 + overlap;
 
-	cairo_set_source_u32(cairo, box_colors.background);
-	cairo_rectangle(cairo, *x, 0, width, height);
-	cairo_fill(cairo);
+	/* Fill the background */
+	/* cairo_set_source_u32(cairo, box_colors.background); */
+	/* cairo_rectangle(cairo, *x + overlap, 0, width, height); */
+	/* cairo_fill(cairo); */
 
 	cairo_set_source_u32(cairo, box_colors.border);
-	cairo_rectangle(cairo, *x, 0, width, border_width);
+	cairo_move_to(cairo, *x, 0);
+	cairo_line_to(cairo, *x + _width, 0);
+	cairo_line_to(cairo, *x + _width + overlap, height / 2);
+	cairo_line_to(cairo, *x + _width, height);
+	cairo_line_to(cairo, *x, height);
+	cairo_line_to(cairo, *x + overlap, height / 2);
+	cairo_close_path(cairo);
 	cairo_fill(cairo);
-	cairo_rectangle(cairo, *x, 0, border_width, height);
+
+	cairo_set_source_u32(cairo, box_colors.background);
+	cairo_move_to(cairo, *x + 1, 1);
+	cairo_line_to(cairo, *x + _width - 1, 1);
+	cairo_line_to(cairo, *x + _width + overlap - 1, height / 2);
+	cairo_line_to(cairo, *x + _width - 1, height - 1);
+	cairo_line_to(cairo, *x + 1, height - 1);
+	cairo_line_to(cairo, *x + overlap + 1, height / 2);
+	cairo_close_path(cairo);
 	cairo_fill(cairo);
-	cairo_rectangle(cairo, *x + width - border_width, 0, border_width, height);
-	cairo_fill(cairo);
-	cairo_rectangle(cairo, *x, height - border_width, width, border_width);
-	cairo_fill(cairo);
+
+	/* cairo_set_source_u32(cairo, box_colors.); */
+
+	/* cairo_set_source_u32(cairo, box_colors.border); */
+	/* cairo_rectangle(cairo, *x, 0, width, border_width); */
+	/* cairo_fill(cairo); */
+	/* cairo_rectangle(cairo, *x, 0, border_width, height); */
+	/* cairo_fill(cairo); */
+	/* cairo_rectangle(cairo, *x + width - border_width, 0, border_width, height); */
+	/* cairo_fill(cairo); */
+	/* cairo_rectangle(cairo, *x, height - border_width, width, border_width); */
+	/* cairo_fill(cairo); */
 
 	double text_y = height / 2.0 - text_height / 2.0;
 	cairo_set_source_u32(cairo, box_colors.text);
-	cairo_move_to(cairo, *x + width / 2 - text_width / 2, (int)floor(text_y));
+	cairo_move_to(cairo, *x + width / 2 - text_width / 2 + 3, (int)floor(text_y));
 	pango_printf(cairo, config->font, output->scale, config->pango_markup,
 			"%s", ws->label);
 
@@ -447,7 +554,7 @@ static uint32_t render_workspace_button(cairo_t *cairo,
 	hotspot->data = strdup(ws->name);
 	wl_list_insert(&output->hotspots, &hotspot->link);
 
-	*x += width;
+	*x += _width;
 	return output->height;
 }
 
