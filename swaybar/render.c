@@ -230,7 +230,7 @@ static uint32_t render_status_block(cairo_t *cairo,
 		? config->colors.urgent_workspace.background : block->background;
 	if (bg_color) {
 		cairo_set_source_u32(cairo, bg_color);
-		cairo_rectangle(cairo, pos - 0.5 * output->scale,
+		cairo_rectangle(cairo, x_pos - 0.5 * output->scale,
 				/* output->scale, width, height); */
 				0, width, height);
 		cairo_fill(cairo);
@@ -322,7 +322,7 @@ static uint32_t render_status_block(cairo_t *cairo,
 		/* cairo_stroke(cairo); */
 	}
 
-	pos += width;
+	x_pos += width;
 
 	if (block->border && block->border_right > 0) {
 		x_pos += margin;
